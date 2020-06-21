@@ -1,7 +1,7 @@
 {
   "name": "cash-dom",
   "description": "An absurdly small jQuery alternative for modern browsers.",
-  "version": "6.0.2",
+  "version": "8.0.0",
   "license": "MIT",
   "browser": "./dist/cash.js",
   "main": "./dist/cash.js",
@@ -37,29 +37,30 @@
     "prepublishOnly": "npm run clean && npm run build:deploy && npm run test:karma"
   },
   "bugs": {
-    "url": "https://github.com/kenwheeler/cash/issues"
+    "url": "https://github.com/fabiospampinato/cash/issues"
   },
-  "homepage": "https://github.com/kenwheeler/cash",
+  "homepage": "https://github.com/fabiospampinato/cash",
   "author": "Ken Wheeler <ken_wheeler@me.com>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kenwheeler/cash.git"
+    "url": "https://github.com/fabiospampinato/cash.git"
   },
   "dependencies": {},
   "devDependencies": {
     "browser-sync": "^2.26.3",
     "coveralls": "^3.0.9",
     "jquery": "^3.3.1",
-    "karma": "^3.0.0",
-    "karma-chrome-launcher": "^2.2.0",
+    "karma": "^4.0.0",
+    "karma-chrome-launcher": "^3.0.0",
     "karma-coverage": "^2.0.1",
     "karma-firefox-launcher": "^1.1.0",
-    "karma-qunit": "^2.1.0",
-    "karma-sauce-launcher": "^1.2.0",
+    "karma-qunit": "^4.0.0",
+    "karma-sauce-launcher": "^4.0.0",
     "karma-spec-reporter": "0.0.32",
     "opn-cli": "^3.1.0",
     "pacco": "^2.1.4",
     "qunit": "^2.7.1",
-    "qunit-ava-spec": "^1.0.0"
+    "qunit-ava-spec": "^1.0.0",
+    "typescript": "^3.9.3"
   }
 }

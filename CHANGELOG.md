@@ -1,3 +1,25 @@
+### Version 8.0.0
+- Improved alignment with jQuery regarding handling of non-bubbling events significantly
+
+### Version 7.0.4
+- Ensuring unusual but valid simple selectors are handled properly
+
+### Version 7.0.3
+- Updated “EleLoose” type
+
+### Version 7.0.2
+- Readme: updated npm installation command
+- Updated the “EleLoose” TypeScript type ensuring it isn’t evaluated as “never”
+
+### Version 7.0.1
+- $.fn.css: added support for retrieving properties of disconnected nodes
+
+### Version 7.0.0
+- focus|blur|mouseenter|mouseleave: ensuring namespaces are handled properly
+- focus|blur|mouseenter|mouseleave: aligned behavior more with jQuery
+- focus|blur|mouseenter|mouseleave: ensuring natively triggered events are handled properly
+- Migration guide: mentioning native non-bubbling events
+
 ### Version 6.0.2
 - Readme: improved comparison with jQuery, fixing some wrong/unfair comparisons/statements
 - Migration guide: mentioning sort order

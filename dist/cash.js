@@ -1,4 +1,4 @@
-/* MIT https://github.com/kenwheeler/cash */
+/* MIT https://github.com/fabiospampinato/cash */
 (function(){
 "use strict";
 
@@ -49,8 +49,8 @@ var doc = document,
     slice = ArrayPrototype.slice,
     some = ArrayPrototype.some,
     splice = ArrayPrototype.splice;
-var idRe = /^#[\w-]*$/,
-    classRe = /^\.[\w-]*$/,
+var idRe = /^#(?:[\w-]|\\.|[^\x00-\xa0])*$/,
+    classRe = /^\.(?:[\w-]|\\.|[^\x00-\xa0])*$/,
     htmlRe = /<.+>/,
     tagRe = /^\w+$/; // @require ./variables.ts
 
@@ -400,7 +400,7 @@ fn.add = function (selector, context) {
 function computeStyle(ele, prop, isVariable) {
   if (!isElement(ele)) return;
   var style = win.getComputedStyle(ele, null);
-  return isVariable ? style.getPropertyValue(prop) || undefined : style[prop];
+  return isVariable ? style.getPropertyValue(prop) || undefined : style[prop] || ele.style[prop];
 } // @require ./compute_style.ts
 
 
@@ -725,9 +725,10 @@ fn.off = function (eventFullName, selector, callback) {
     }
 
     each(getSplitValues(eventFullName), function (i, eventFullName) {
-      var _a = parseEventName(getEventNameBubbling(eventFullName)),
-          name = _a[0],
-          namespaces = _a[1];
+      var _a = parseEventName(eventFullName),
+          nameOriginal = _a[0],
+          namespaces = _a[1],
+          name = getEventNameBubbling(nameOriginal);
 
       _this.each(function (i, ele) {
         if (!isElement(ele) && !isDocument(ele) && !isWindow(ele)) return;
@@ -770,9 +771,12 @@ function on(eventFullName, selector, data, callback, _one) {
 
   if (!callback) return this;
   each(getSplitValues(eventFullName), function (i, eventFullName) {
-    var _a = parseEventName(getEventNameBubbling(eventFullName)),
-        name = _a[0],
-        namespaces = _a[1];
+    var _a = parseEventName(eventFullName),
+        nameOriginal = _a[0],
+        namespaces = _a[1],
+        name = getEventNameBubbling(nameOriginal),
+        isEventHover = nameOriginal in eventsHover,
+        isEventFocus = nameOriginal in eventsFocus;
 
     if (!name) return;
 
@@ -780,7 +784,10 @@ function on(eventFullName, selector, data, callback, _one) {
       if (!isElement(ele) && !isDocument(ele) && !isWindow(ele)) return;
 
       var finalCallback = function finalCallback(event) {
+        if (event.target["___i" + event.type]) return event.stopImmediatePropagation(); // Ignoring native event in favor of the upcoming custom one
+
         if (event.namespace && !hasNamespaces(namespaces, event.namespace.split(eventsNamespacesSeparator))) return;
+        if (!selector && (isEventFocus && (event.target !== ele || event.___ot === name) || isEventHover && event.relatedTarget && ele.contains(event.relatedTarget))) return;
         var thisArg = ele;
 
         if (selector) {
@@ -856,24 +863,30 @@ fn.ready = function (callback) {
 fn.trigger = function (event, data) {
   if (isString(event)) {
     var _a = parseEventName(event),
-        name_1 = _a[0],
-        namespaces = _a[1];
+        nameOriginal = _a[0],
+        namespaces = _a[1],
+        name_1 = getEventNameBubbling(nameOriginal);
 
     if (!name_1) return this;
     var type = eventsMouseRe.test(name_1) ? 'MouseEvents' : 'HTMLEvents';
     event = doc.createEvent(type);
     event.initEvent(name_1, true, true);
     event.namespace = namespaces.join(eventsNamespacesSeparator);
+    event.___ot = nameOriginal;
   }
 
   event.___td = data;
-  var isEventFocus = event.type in eventsFocus;
+  var isEventFocus = event.___ot in eventsFocus;
   return this.each(function (i, ele) {
-    if (isEventFocus && isFunction(ele[event.type])) {
-      ele[event.type]();
-    } else {
-      ele.dispatchEvent(event);
+    if (isEventFocus && isFunction(ele[event.___ot])) {
+      ele["___i" + event.type] = true; // Ensuring the native event is ignored
+
+      ele[event.___ot]();
+
+      ele["___i" + event.type] = false; // Ensuring the custom event is not ignored
     }
+
+    ele.dispatchEvent(event);
   });
 }; // @optional ./off.ts
 // @optional ./on.ts

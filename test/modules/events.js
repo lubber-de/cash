@@ -6,7 +6,10 @@ var fixture = '\
         <div class="grandchild"></div>\
       </div>\
     </div>\
-    <input class="event-focus">\
+    <input class="input" />\
+    <div class="event-focus" tabindex="-1">\
+      <div class="event-focus-child" tabindex="-1"></div>\
+    </div>\
   </div>\
 ';
 
@@ -90,31 +93,69 @@ describe ( 'Events', { beforeEach: getFixtureInit ( fixture ) }, function () {
 
     });
 
-    ( document.hasFocus () ? it : it.skip )( 'supports events that do not bubble', function ( t ) { // If the document isn't focused the element won't get the focus either
+    describe ( 'supports events that do not bubble', function ( it ) { // If the document isn't focused the element won't get the focus either
 
-      var events = ['focus', 'blur', 'mouseenter', 'mouseleave'],
-          eventsTrigger = ['focus', 'blur', 'mouseover', 'mouseout'];
+      if ( !document.hasFocus () ) return; // If the document isn't focused the element won't get the focus either
+
+      var events = ['focus.namespace', 'focus', 'blur', 'focusin', 'focusout', 'mouseenter', 'mouseleave', 'mouseover', 'mouseout', 'focus', 'blur', 'mouseenter', 'mouseleave'],
+          eventsTrigger = ['focus.namespace', 'focus', 'blur', 'focusin', 'focusout', 'mouseenter', 'mouseleave', 'mouseover', 'mouseout', 'focusin', 'focusout', 'mouseover', 'mouseout'],
+          counts = [[1, 1, 3, 3, 2, 2, 0], [1, 1, 3, 3, 2, 2, 0], [1, 1, 3, 3, 2, 2, 0], [2, 2, 5, 5, 5, 5, 0], [2, 2, 5, 5, 5, 5, 0], [2, 2, 5, 5, 5, 5, 0], [2, 2, 5, 5, 5, 5, 0], [2, 2, 5, 5, 5, 5, 0], [2, 2, 5, 5, 5, 5, 0], [0, 0, 2, 2, 2, 2, 0], [0, 0, 2, 2, 2, 2, 0], [2, 2, 5, 5, 5, 5, 0], [2, 2, 5, 5, 5, 5, 0]];
 
       events.forEach ( function ( event, index ) {
 
-        var ele = $('.event-focus');
-        var parent = $('.parent');
-        var count = 0;
-        var eventTrigger = eventsTrigger[index];
+        it ( '[' + event + ' -> ' + eventsTrigger[index] + ']', function ( t ) {
 
-        function handler () {
-          count++;
-        }
+          var doc = $(document);
+          var ele = $('.event-focus');
+          var parent = $('.parent');
+          var child = $('.event-focus-child');
+          var count = 0;
+          var eventTrigger = eventsTrigger[index];
 
-        parent.on ( event, handler );
-        ele.on ( event, handler );
-        ele.trigger ( eventTrigger );
+          function handler () {
+            count++;
+          }
 
-        parent.off ( event );
-        ele.off ( event );
-        ele.trigger ( eventTrigger );
+          function check ( countIndex ) {
+            t.is ( count, counts[index][countIndex] );
+            count = 0;
+          }
 
-        t.is ( count, 2 );
+          doc.on ( event, handler );
+          doc.on ( event, '.event-focus', handler );
+          parent.on ( event, handler );
+          parent.on ( event, '.event-focus', handler );
+          ele.on ( event, handler );
+
+          parent.trigger ( eventTrigger );
+          check ( 0 );
+          parent.trigger ( eventTrigger );
+          check ( 1 );
+          ele.trigger ( eventTrigger );
+          check ( 2 );
+          ele.trigger ( eventTrigger );
+          check ( 3 );
+          child.trigger ( eventTrigger );
+          check ( 4 );
+          child.trigger ( eventTrigger );
+          check ( 5 );
+
+          doc.off ( event, handler );
+          doc.off ( event, '.event-focus', handler );
+          parent.off ( event, handler );
+          parent.off ( event, '.event-focus', handler );
+          ele.off ( event, handler );
+
+          parent.trigger ( eventTrigger );
+          parent.trigger ( eventTrigger );
+          ele.trigger ( eventTrigger );
+          ele.trigger ( eventTrigger );
+          child.trigger ( eventTrigger );
+          child.trigger ( eventTrigger );
+
+          check ( 6 );
+
+        });
 
       });
 
@@ -132,6 +173,36 @@ describe ( 'Events', { beforeEach: getFixtureInit ( fixture ) }, function () {
       ele.trigger ( 'focus' );
 
       t.is ( count, 1 );
+
+      ele[0].blur = function () {
+        count++;
+      };
+
+      ele.trigger ( 'blur' );
+
+      t.is ( count, 2 );
+
+    });
+
+    ( document.hasFocus () ? it : it.skip )( 'listens to native focus/blur', function ( t ) { // If the document isn't focused the element won't get the focus either
+
+      var events = ['focus', 'blur'];
+
+      events.forEach ( function ( event ) {
+
+        var input = $('.input');
+        var count = 0;
+
+        function handler () {
+          count++;
+        }
+
+        input.on ( event, handler );
+        input[0][event] ();
+
+        t.is ( count, 1 );
+
+      });
 
     });
 
@@ -633,11 +704,11 @@ describe ( 'Events', { beforeEach: getFixtureInit ( fixture ) }, function () {
       var done = assert.async ();
 
       window.onerror = function ( err ) {
-        assert.ok ( /foo/i.test ( err ) );
+        assert.ok ( /ready/i.test ( err ) );
       };
 
       var handler = function () {
-        throw new Error ( 'foo' );
+        throw new Error ( 'Ready exception...' );
       };
 
       $(handler);
@@ -689,10 +760,9 @@ describe ( 'Events', { beforeEach: getFixtureInit ( fixture ) }, function () {
           nativeHandler.apply ( this, arguments );
         };
 
-        ele.on ( event, handler );
         ele.trigger ( event );
 
-        t.is ( count, 2 );
+        t.is ( count, 1 );
 
       });
 

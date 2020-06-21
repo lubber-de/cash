@@ -35,7 +35,11 @@ function attempt<T, U> ( fn: (( arg?: U ) => T), arg?: U ): T | U {
 interface Event {
   namespace: string,
   data: any,
+  relatedTarget?: Node | null,
   ___cd?: boolean, // Delegate
+  ___ifocus?: boolean, // Ignore focus
+  ___iblur?: boolean, // Ignore blur
+  ___ot?: string, // Original type
   ___td?: boolean // Trigger data
 }
 
@@ -52,13 +56,11 @@ interface CashStatic {
 
 type falsy = undefined | null | false | 0 | '';
 
-type EleHTML = HTMLElement | HTMLAnchorElement | HTMLAppletElement | HTMLAreaElement | HTMLAudioElement | HTMLBRElement | HTMLBaseElement | HTMLBaseFontElement | HTMLBodyElement | HTMLButtonElement | HTMLCanvasElement | HTMLDListElement | HTMLDataElement | HTMLDataListElement | HTMLDetailsElement | HTMLDialogElement | HTMLDirectoryElement | HTMLDivElement | HTMLEmbedElement | HTMLFieldSetElement | HTMLFontElement | HTMLFormElement | HTMLFrameElement | HTMLFrameSetElement | HTMLHRElement | HTMLHeadElement | HTMLHeadingElement | HTMLHtmlElement | HTMLIFrameElement | HTMLImageElement | HTMLInputElement | HTMLLIElement | HTMLLabelElement | HTMLLegendElement | HTMLLinkElement | HTMLMapElement | HTMLMarqueeElement | HTMLMediaElement | HTMLMenuElement | HTMLMetaElement | HTMLMeterElement | HTMLModElement | HTMLOListElement | HTMLObjectElement | HTMLOptGroupElement | HTMLOptionElement | HTMLOrSVGElement | HTMLOutputElement | HTMLParagraphElement | HTMLParamElement | HTMLPictureElement | HTMLPreElement | HTMLProgressElement | HTMLQuoteElement | HTMLScriptElement | HTMLSelectElement | HTMLSlotElement | HTMLSourceElement | HTMLSpanElement | HTMLStyleElement | HTMLTableCaptionElement | HTMLTableCellElement | HTMLTableColElement | HTMLTableDataCellElement | HTMLTableElement | HTMLTableHeaderCellElement | HTMLTableRowElement | HTMLTableSectionElement | HTMLTemplateElement | HTMLTextAreaElement | HTMLTimeElement | HTMLTitleElement | HTMLTrackElement | HTMLUListElement | HTMLUnknownElement | HTMLVideoElement;
-type EleHTMLLoose = HTMLElement & HTMLAnchorElement & HTMLAppletElement & HTMLAreaElement & HTMLAudioElement & HTMLBRElement & HTMLBaseElement & HTMLBaseFontElement & HTMLBodyElement & HTMLButtonElement & HTMLCanvasElement & HTMLDListElement & HTMLDataElement & HTMLDataListElement & HTMLDetailsElement & HTMLDialogElement & HTMLDirectoryElement & HTMLDivElement & HTMLEmbedElement & HTMLFieldSetElement & HTMLFontElement & HTMLFormElement & HTMLFrameElement & HTMLFrameSetElement & HTMLHRElement & HTMLHeadElement & HTMLHeadingElement & HTMLHtmlElement & HTMLIFrameElement & HTMLImageElement & HTMLInputElement & HTMLLIElement & HTMLLabelElement & HTMLLegendElement & HTMLLinkElement & HTMLMapElement & HTMLMarqueeElement & HTMLMediaElement & HTMLMenuElement & HTMLMetaElement & HTMLMeterElement & HTMLModElement & HTMLOListElement & HTMLObjectElement & HTMLOptGroupElement & HTMLOptionElement & HTMLOrSVGElement & HTMLOutputElement & HTMLParagraphElement & HTMLParamElement & HTMLPictureElement & HTMLPreElement & HTMLProgressElement & HTMLQuoteElement & HTMLScriptElement & HTMLSelectElement & HTMLSlotElement & HTMLSourceElement & HTMLSpanElement & HTMLStyleElement & HTMLTableCaptionElement & HTMLTableCellElement & HTMLTableColElement & HTMLTableDataCellElement & HTMLTableElement & HTMLTableHeaderCellElement & HTMLTableRowElement & HTMLTableSectionElement & HTMLTemplateElement & HTMLTextAreaElement & HTMLTimeElement & HTMLTitleElement & HTMLTrackElement & HTMLUListElement & HTMLUnknownElement & HTMLVideoElement;
-type Ele = Window | Document | EleHTML | Element | Node;
-type EleLoose = Window & Document & EleHTMLLoose & Element & Node; //UGLY: Trick to remove some kind-of useless type errors //URL: https://github.com/kenwheeler/cash/issues/278
+type Ele = Window | Document | HTMLElement | Element | Node;
+type EleLoose = HTMLElement & Element & Node; //UGLY: Trick to remove some kind-of useless type errors //URL: https://github.com/fabiospampinato/cash/issues/278
 type Selector = falsy | string | Function | HTMLCollection | NodeList | Ele | Ele[] | ArrayLike<Ele> | Cash;
 type Comparator = string | Ele | Cash | (( this: EleLoose, index: number, ele: EleLoose ) => boolean);
-type Context = Document | EleHTML | Element;
+type Context = Document | HTMLElement | Element;
 
 type EventCallback = {
   ( event: any, data?: any ): any,
@@ -77,8 +79,8 @@ const doc = document,
       {isArray, prototype: ArrayPrototype} = Array,
       {concat, filter, indexOf, map, push, slice, some, splice} = ArrayPrototype;
 
-const idRe = /^#[\w-]*$/,
-      classRe = /^\.[\w-]*$/,
+const idRe = /^#(?:[\w-]|\\.|[^\x00-\xa0])*$/,
+      classRe = /^\.(?:[\w-]|\\.|[^\x00-\xa0])*$/,
       htmlRe = /<.+>/,
       tagRe = /^\w+$/;
 
@@ -821,7 +823,7 @@ function computeStyle ( ele: EleLoose, prop: string, isVariable?: boolean ): str
 
   const style = win.getComputedStyle ( ele, null );
 
-  return isVariable ? style.getPropertyValue ( prop ) || undefined : style[prop];
+  return isVariable ? style.getPropertyValue ( prop ) || undefined : style[prop] || ele.style[prop];
 
 }
 
@@ -1429,7 +1431,8 @@ fn.off = function ( this: Cash, eventFullName?: string | Record<string, EventCal
 
     each ( getSplitValues ( eventFullName ), ( i, eventFullName ) => {
 
-      const [name, namespaces] = parseEventName ( getEventNameBubbling ( eventFullName ) );
+      const [nameOriginal, namespaces] = parseEventName ( eventFullName ),
+            name = getEventNameBubbling ( nameOriginal );
 
       this.each ( ( i, ele ) => {
 
@@ -1526,7 +1529,10 @@ function on ( this: Cash, eventFullName: Record<string, EventCallback> | string,
 
   each ( getSplitValues ( eventFullName ), ( i, eventFullName ) => {
 
-    const [name, namespaces] = parseEventName ( getEventNameBubbling ( eventFullName ) );
+    const [nameOriginal, namespaces] = parseEventName ( eventFullName ),
+          name = getEventNameBubbling ( nameOriginal ),
+          isEventHover = ( nameOriginal in eventsHover ),
+          isEventFocus = ( nameOriginal in eventsFocus );
 
     if ( !name ) return;
 
@@ -1536,7 +1542,11 @@ function on ( this: Cash, eventFullName: Record<string, EventCallback> | string,
 
       const finalCallback = function ( event: Event ) {
 
+        if ( event.target[`___i${event.type}`] ) return event.stopImmediatePropagation (); // Ignoring native event in favor of the upcoming custom one
+
         if ( event.namespace && !hasNamespaces ( namespaces, event.namespace.split ( eventsNamespacesSeparator ) ) ) return;
+
+        if ( !selector && ( ( isEventFocus && ( event.target !== ele || event.___ot === name ) ) || ( isEventHover && event.relatedTarget && ele.contains ( event.relatedTarget ) ) ) ) return;
 
         let thisArg: EventTarget = ele;
 
@@ -1671,6 +1681,7 @@ fn.ready = function ( this: Cash, callback: ( $: typeof cash ) => any ) {
 // @require core/type_checking.ts
 // @require core/variables.ts
 // @require collection/each.ts
+// @require ./helpers/get_event_name_bubbling.ts
 // @require ./helpers/parse_event_name.ts
 // @require ./helpers/variables.ts
 
@@ -1682,7 +1693,8 @@ fn.trigger = function ( this: Cash, event: Event | string, data?: any ) {
 
   if ( isString ( event ) ) {
 
-    const [name, namespaces] = parseEventName ( event );
+    const [nameOriginal, namespaces] = parseEventName ( event ),
+          name = getEventNameBubbling ( nameOriginal );
 
     if ( !name ) return this;
 
@@ -1691,24 +1703,27 @@ fn.trigger = function ( this: Cash, event: Event | string, data?: any ) {
     event = doc.createEvent ( type );
     event.initEvent ( name, true, true );
     event.namespace = namespaces.join ( eventsNamespacesSeparator );
+    event.___ot = nameOriginal;
 
   }
 
   event.___td = data;
 
-  const isEventFocus = ( event.type in eventsFocus );
+  const isEventFocus = ( event.___ot in eventsFocus );
 
   return this.each ( ( i, ele ) => {
 
-    if ( isEventFocus && isFunction ( ele[event.type] ) ) {
+    if ( isEventFocus && isFunction ( ele[event.___ot] ) ) {
 
-      ele[event.type]();
+      ele[`___i${event.type}`] = true; // Ensuring the native event is ignored
 
-    } else {
+      ele[event.___ot]();
 
-      ele.dispatchEvent ( event );
+      ele[`___i${event.type}`] = false; // Ensuring the custom event is not ignored
 
     }
+
+    ele.dispatchEvent ( event );
 
   });
 

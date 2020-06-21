@@ -77,7 +77,10 @@ function on ( this: Cash, eventFullName: Record<string, EventCallback> | string,
 
   each ( getSplitValues ( eventFullName ), ( i, eventFullName ) => {
 
-    const [name, namespaces] = parseEventName ( getEventNameBubbling ( eventFullName ) );
+    const [nameOriginal, namespaces] = parseEventName ( eventFullName ),
+          name = getEventNameBubbling ( nameOriginal ),
+          isEventHover = ( nameOriginal in eventsHover ),
+          isEventFocus = ( nameOriginal in eventsFocus );
 
     if ( !name ) return;
 
@@ -87,7 +90,11 @@ function on ( this: Cash, eventFullName: Record<string, EventCallback> | string,
 
       const finalCallback = function ( event: Event ) {
 
+        if ( event.target[`___i${event.type}`] ) return event.stopImmediatePropagation (); // Ignoring native event in favor of the upcoming custom one
+
         if ( event.namespace && !hasNamespaces ( namespaces, event.namespace.split ( eventsNamespacesSeparator ) ) ) return;
+
+        if ( !selector && ( ( isEventFocus && ( event.target !== ele || event.___ot === name ) ) || ( isEventHover && event.relatedTarget && ele.contains ( event.relatedTarget ) ) ) ) return;
 
         let thisArg: EventTarget = ele;
 
